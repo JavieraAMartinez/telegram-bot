@@ -11,6 +11,8 @@ const ADMIN_ID = 6330182024;
 const CUENTA = `
 💳 Datos de pago (Transferencia):
 
+💳 Datos de pago (Transferencia):
+
 Banco: Mercado Pago
 Nombre: Chris Mena
 CLABE: 722969010807105889
@@ -28,42 +30,40 @@ const menu = {
   }
 };
 
-bot.on("message", (msg) => {
+bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text || "";
   const user = msg.from.username || "sin_username";
   const name = msg.from.first_name || "";
 
-  // Reenviar TODO al admin (excepto mensajes del mismo admin)
-  if (chatId !== ADMIN_ID) {
-    bot.sendMessage(
+  // =====================
+  // REENVIAR FOTOS SIEMPRE
+  // =====================
+  if (chatId !== ADMIN_ID && msg.photo) {
+    const photoId = msg.photo[msg.photo.length - 1].file_id;
+
+    await bot.sendMessage(
       ADMIN_ID,
-`📩 Nuevo mensaje:
+`📸 Nuevo comprobante:
 
 👤 ${name}
 🔗 @${user}
-🆔 ${chatId}
-
-💬 ${text || "Archivo / imagen"}`
+🆔 ${chatId}`
     );
 
-    if (msg.photo) {
-      const photoId = msg.photo[msg.photo.length - 1].file_id;
-      bot.sendPhoto(ADMIN_ID, photoId);
-    }
+    await bot.sendPhoto(ADMIN_ID, photoId);
+    return;
   }
 
+  // =====================
+  // MENÚ
+  // =====================
   if (text === "/start" || text === "Menu") {
-    bot.sendMessage(
-      chatId,
-`👋 Bienvenido
-
-Selecciona una opción:`,
-      menu
-    );
+    bot.sendMessage(chatId, `👋 Bienvenido\n\nSelecciona una opción:`, menu);
+    return;
   }
 
-  else if (text === "📋 Canales") {
+  if (text === "📋 Canales") {
     bot.sendMessage(chatId,
 `📋 Canales disponibles:
 
@@ -71,11 +71,11 @@ Selecciona una opción:`,
 ✅ DianaEstradaVip
 ✅ CaeliVip
 ✅ SamrazzuVIP
-✅ LiviaBritoVip`
-    );
+✅ LiviaBritoVip`);
+    return;
   }
 
-  else if (text === "💰 Precios") {
+  if (text === "💰 Precios") {
     bot.sendMessage(chatId,
 `💰 Precios:
 
@@ -84,13 +84,35 @@ Selecciona una opción:`,
 🔥 CaeliVip – $50 MXN
 🔥 LiviaBritoVip – $50 MXN
 
-⭐ SamrazzuVIP – $100 MXN`
-    );
+⭐ SamrazzuVIP – $100 MXN`);
+    return;
   }
 
-  else if (text === "💳 Pagar") {
+  if (text === "💳 Pagar") {
     bot.sendMessage(chatId, CUENTA);
+    return;
+  }
+
+  // =====================
+  // REENVIAR SOLO MENSAJES LIBRES (no botones)
+  // =====================
+  if (
+    chatId !== ADMIN_ID &&
+    text &&
+    !["📋 Canales", "💰 Precios", "💳 Pagar", "/start", "Menu"].includes(text)
+  ) {
+    bot.sendMessage(
+      ADMIN_ID,
+`📩 Mensaje del cliente:
+
+👤 ${name}
+🔗 @${user}
+🆔 ${chatId}
+
+💬 ${text}`
+    );
   }
 });
 
 console.log("Bot activo 🤖");
+
