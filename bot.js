@@ -9,10 +9,9 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 const CUENTA = `
 💳 Datos de pago (Transferencia):
 
-Banco: BBVA
-Nombre: TU NOMBRE
-Cuenta: 1234567890
-CLABE: 000000000000000000
+Banco: Mercado Pago
+Nombre: Chris Mena
+CLABE: 722969010807105889
 
 📸 Después de pagar, manda tu comprobante por aquí.
 `;
