@@ -1,7 +1,14 @@
 {
-"dependencies": {
-  "dotenv": "^16.0.0",
-  "node-telegram-bot-api": "^0.66.0"
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "node-telegram-bot-api": "^0.66.0"
+  }
 }
 
-}
