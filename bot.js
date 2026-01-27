@@ -4,8 +4,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
-
-// 👉 CAMBIA ESTOS DATOS POR LOS TUYOS REALES
 const CUENTA = `
 💳 Datos de pago (Transferencia):
 
@@ -16,49 +14,44 @@ CLABE: 722969010807105889
 📸 Después de pagar, manda tu comprobante por aquí.
 `;
 
+const menu = {
+  reply_markup: {
+    keyboard: [
+      ["📋 Canales", "💰 Precios"],
+      ["💳 Pagar"]
+    ],
+    resize_keyboard: true
+  }
+};
+
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
-  const text = (msg.text || "").toLowerCase();
+  const text = msg.text || "";
 
-  // Mensaje inicial
-  if (text === "/start" || text.includes("hola") || text.includes("info")) {
+  if (text === "/start" || text === "Menu") {
     bot.sendMessage(
       chatId,
-`Hola 👋
+`👋 Bienvenido
 
-Bienvenido/a.
-
-Vendo accesos a canales VIP de Telegram.
-
-Escribe una opción:
-
-📋 canales
-💰 precio
-💳 pago
-`
+Selecciona una opción:`,
+      menu
     );
   }
 
-  // Lista de canales
-  else if (text.includes("canales")) {
-    bot.sendMessage(
-      chatId,
+  else if (text === "📋 Canales") {
+    bot.sendMessage(chatId,
 `📋 Canales disponibles:
 
 ✅ KimshantalVip
 ✅ DianaEstradaVip
 ✅ CaeliVip
 ✅ SamrazzuVIP
-✅ LiviaBritoVip
-
-Escribe "precio" para ver costos.`
+✅ LiviaBritoVip`
     );
   }
 
-  // Precios
-  else if (text.includes("precio")) {
-    bot.sendMessage(
-      chatId,
+  else if (text === "💰 Precios") {
+    bot.sendMessage(chatId,
 `💰 Precios:
 
 🔥 KimshantalVip – $50 MXN
@@ -66,28 +59,12 @@ Escribe "precio" para ver costos.`
 🔥 CaeliVip – $50 MXN
 🔥 LiviaBritoVip – $50 MXN
 
-⭐ SamrazzuVIP – $100 MXN
-
-Escribe "pago" para recibir los datos de transferencia.`
+⭐ SamrazzuVIP – $100 MXN`
     );
   }
 
-  // Datos de pago
-  else if (text.includes("pago")) {
+  else if (text === "💳 Pagar") {
     bot.sendMessage(chatId, CUENTA);
-  }
-
-  // Mensaje por defecto
-  else {
-    bot.sendMessage(
-      chatId,
-`No entendí tu mensaje 🙂
-
-Escribe:
-canales
-precio
-pago`
-    );
   }
 });
 
