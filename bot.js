@@ -8,9 +8,10 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 // TU CHAT ID PERSONAL
 const ADMIN_ID = 6330182024;
 
-const CUENTA = `
-💳 Datos de pago (Transferencia):
+// Anti duplicados por usuario
+const lastAction = {};
 
+const CUENTA = `
 💳 Datos de pago (Transferencia):
 
 Banco: Mercado Pago
@@ -89,6 +90,12 @@ bot.on("message", async (msg) => {
   }
 
   if (text === "💳 Pagar") {
+    const now = Date.now();
+
+    if (lastAction[chatId] && now - lastAction[chatId] < 2000) return;
+
+    lastAction[chatId] = now;
+
     bot.sendMessage(chatId, CUENTA);
     return;
   }
@@ -115,4 +122,5 @@ bot.on("message", async (msg) => {
 });
 
 console.log("Bot activo 🤖");
+
 
