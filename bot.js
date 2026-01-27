@@ -4,6 +4,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+
+// TU CHAT ID PERSONAL
+const ADMIN_ID = 6330182024;
+
 const CUENTA = `
 💳 Datos de pago (Transferencia):
 
@@ -27,6 +31,27 @@ const menu = {
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text || "";
+  const user = msg.from.username || "sin_username";
+  const name = msg.from.first_name || "";
+
+  // Reenviar TODO al admin (excepto mensajes del mismo admin)
+  if (chatId !== ADMIN_ID) {
+    bot.sendMessage(
+      ADMIN_ID,
+`📩 Nuevo mensaje:
+
+👤 ${name}
+🔗 @${user}
+🆔 ${chatId}
+
+💬 ${text || "Archivo / imagen"}`
+    );
+
+    if (msg.photo) {
+      const photoId = msg.photo[msg.photo.length - 1].file_id;
+      bot.sendPhoto(ADMIN_ID, photoId);
+    }
+  }
 
   if (text === "/start" || text === "Menu") {
     bot.sendMessage(
