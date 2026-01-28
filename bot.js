@@ -5,13 +5,13 @@ dotenv.config();
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
-// ADMIN
+// TU ID ADMIN
 const ADMIN_ID = 6330182024;
 
 // Anti duplicados
 const lastAction = {};
 
-// Canal links
+// LINKS DE CANALES (CAMBIA POR LOS REALES)
 const CHANNELS = {
   KimshantalVip: "https://t.me/TU_LINK_1",
   DianaEstradaVip: "https://t.me/TU_LINK_2",
@@ -20,7 +20,7 @@ const CHANNELS = {
   LiviaBritoVip: "https://t.me/TU_LINK_5"
 };
 
-// Pagos
+// Datos de pago
 const CUENTA = `
 💳 Datos de pago (Transferencia):
 
@@ -31,7 +31,7 @@ CLABE: 722969010807105889
 📸 Después de pagar, manda tu comprobante por aquí.
 `;
 
-// Menu
+// MENÚ
 const keyboard = {
   reply_markup: {
     keyboard: [
@@ -44,16 +44,18 @@ const keyboard = {
 
 // START
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id,
+  bot.sendMessage(
+    msg.chat.id,
 `Hola 👋 Bienvenido
 
 Accesos VIP disponibles.
 
 Usa el menú 👇`,
-keyboard);
+    keyboard
+  );
 });
 
-// Mensajes
+// MENSAJES
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
@@ -68,7 +70,8 @@ bot.on("message", (msg) => {
 ✅ DianaEstradaVip
 ✅ CaeliVip
 ✅ SamrazzuVIP
-✅ LiviaBritoVip`);
+✅ LiviaBritoVip`
+    );
   }
 
   if (text === "💰 Precios") {
@@ -80,18 +83,21 @@ bot.on("message", (msg) => {
 🔥 CaeliVip – $50 MXN
 🔥 LiviaBritoVip – $50 MXN
 
-⭐ SamrazzuVIP – $100 MXN`);
+⭐ SamrazzuVIP – $100 MXN`
+    );
   }
 
   if (text === "💳 Pagar") {
     const now = Date.now();
+
     if (lastAction[chatId] && now - lastAction[chatId] < 2000) return;
     lastAction[chatId] = now;
+
     bot.sendMessage(chatId, CUENTA);
   }
 });
 
-// Fotos
+// FOTO COMPROBANTE
 bot.on("photo", (msg) => {
   const chatId = msg.chat.id;
 
@@ -101,16 +107,17 @@ bot.on("photo", (msg) => {
 `📸 Nuevo comprobante
 
 Usuario: @${msg.from.username || "sin username"}
-ID: ${chatId}`);
+ID: ${chatId}`
+  );
 
   bot.forwardMessage(ADMIN_ID, chatId, msg.message_id);
 });
 
-// APROBAR MIXTO
+// APROBAR CON ID O USER
 bot.onText(/\/aprobar (.+) (.+)/, async (msg, match) => {
   if (msg.chat.id !== ADMIN_ID) return;
 
-  let target = match[1];
+  let target = match[1].trim();
   const key = match[2].toLowerCase();
 
   const MAP = {
@@ -122,36 +129,40 @@ bot.onText(/\/aprobar (.+) (.+)/, async (msg, match) => {
   };
 
   if (!MAP[key]) {
-    bot.sendMessage(ADMIN_ID, "❌ Canal inválido");
+    bot.sendMessage(ADMIN_ID,
+`❌ Canal inválido
+
+Usa:
+kim
+dia
+cae
+sam
+liv`
+    );
     return;
   }
 
-  // Si es @usuario
-  if (target.startsWith("@")) {
-    bot.sendMessage(target,
+  try {
+    // Si es ID numérico
+    if (!isNaN(target)) {
+      target = Number(target);
+    }
+
+    await bot.sendMessage(target,
 `✅ Pago confirmado
 
 Aquí tu acceso:
 
 ${MAP[key]}
 
-Gracias 🙌`);
+Gracias 🙌`
+    );
 
     bot.sendMessage(ADMIN_ID, "✅ Acceso enviado");
-    return;
+  } catch (err) {
+    bot.sendMessage(ADMIN_ID, "❌ Error enviando acceso");
+    console.error(err);
   }
-
-  // Si es ID
-  bot.sendMessage(target,
-`✅ Pago confirmado
-
-Aquí tu acceso:
-
-${MAP[key]}
-
-Gracias 🙌`);
-
-  bot.sendMessage(ADMIN_ID, "✅ Acceso enviado");
 });
 
 console.log("Bot activo 🤖");
