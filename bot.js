@@ -3,14 +3,22 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
-
-// TU CHAT ID PERSONAL
+// 👉 TU ID DE TELEGRAM (ADMIN)
 const ADMIN_ID = 6330182024;
 
-// Anti duplicados por usuario
-const lastAction = {};
+// TOKEN
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
+// LINKS DE CANALES
+const CHANNELS = {
+  KimshantalVip: "https://t.me/TU_LINK_1",
+  DianaEstradaVip: "https://t.me/TU_LINK_2",
+  CaeliVip: "https://t.me/TU_LINK_3",
+  SamrazzuVIP: "https://t.me/TU_LINK_4",
+  LiviaBritoVip: "https://t.me/TU_LINK_5"
+};
+
+// DATOS DE TRANSFERENCIA
 const CUENTA = `
 💳 Datos de pago (Transferencia):
 
@@ -20,64 +28,48 @@ CLABE: 722969010807105889
 
 📸 Después de pagar, manda tu comprobante por aquí.
 `;
-
-const menu = {
-  reply_markup: {
-    keyboard: [
-      ["📋 Canales", "💰 Precios"],
-      ["💳 Pagar"]
-    ],
-    resize_keyboard: true
-  }
-};
-
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text || "";
-  const user = msg.from.username || "sin_username";
-  const name = msg.from.first_name || "";
+  const text = (msg.text || "").toLowerCase();
 
-  // =====================
-  // REENVIAR FOTOS SIEMPRE
-  // =====================
-  if (chatId !== ADMIN_ID && msg.photo) {
-    const photoId = msg.photo[msg.photo.length - 1].file_id;
+  // IGNORAR MENSAJES DEL ADMIN PARA EVITAR DUPLICADOS
+  if (chatId === ADMIN_ID && !text.startsWith("/aprobar")) return;
 
-    await bot.sendMessage(
-      ADMIN_ID,
-`📸 Nuevo comprobante:
+  // START
+  if (text === "/start" || text.includes("hola") || text.includes("info")) {
+    return bot.sendMessage(chatId,
+`Hola 👋
 
-👤 ${name}
-🔗 @${user}
-🆔 ${chatId}`
+Bienvenido/a.
+
+Vendo accesos a canales VIP.
+
+Escribe:
+
+📋 canales
+💰 precio
+💳 pago`
     );
-
-    await bot.sendPhoto(ADMIN_ID, photoId);
-    return;
   }
 
-  // =====================
-  // MENÚ
-  // =====================
-  if (text === "/start" || text === "Menu") {
-    bot.sendMessage(chatId, `👋 Bienvenido\n\nSelecciona una opción:`, menu);
-    return;
-  }
-
-  if (text === "📋 Canales") {
-    bot.sendMessage(chatId,
+  // CANALES
+  if (text.includes("canales")) {
+    return bot.sendMessage(chatId,
 `📋 Canales disponibles:
 
 ✅ KimshantalVip
 ✅ DianaEstradaVip
 ✅ CaeliVip
 ✅ SamrazzuVIP
-✅ LiviaBritoVip`);
-    return;
+✅ LiviaBritoVip
+
+Escribe "precio".`
+    );
   }
 
-  if (text === "💰 Precios") {
-    bot.sendMessage(chatId,
+  // PRECIOS
+  if (text.includes("precio")) {
+    return bot.sendMessage(chatId,
 `💰 Precios:
 
 🔥 KimshantalVip – $50 MXN
@@ -85,42 +77,81 @@ bot.on("message", async (msg) => {
 🔥 CaeliVip – $50 MXN
 🔥 LiviaBritoVip – $50 MXN
 
-⭐ SamrazzuVIP – $100 MXN`);
-    return;
-  }
+⭐ SamrazzuVIP – $100 MXN
 
-  if (text === "💳 Pagar") {
-    const now = Date.now();
-
-    if (lastAction[chatId] && now - lastAction[chatId] < 2000) return;
-
-    lastAction[chatId] = now;
-
-    bot.sendMessage(chatId, CUENTA);
-    return;
-  }
-
-  // =====================
-  // REENVIAR SOLO MENSAJES LIBRES (no botones)
-  // =====================
-  if (
-    chatId !== ADMIN_ID &&
-    text &&
-    !["📋 Canales", "💰 Precios", "💳 Pagar", "/start", "Menu"].includes(text)
-  ) {
-    bot.sendMessage(
-      ADMIN_ID,
-`📩 Mensaje del cliente:
-
-👤 ${name}
-🔗 @${user}
-🆔 ${chatId}
-
-💬 ${text}`
+Escribe "pago".`
     );
   }
+
+  // PAGO
+  if (text.includes("pago")) {
+    return bot.sendMessage(chatId, CUENTA);
+  }
+
+  // FOTO = COMPROBANTE
+  if (msg.photo) {
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+
+    await bot.sendMessage(ADMIN_ID,
+`📥 Nuevo comprobante
+
+Cliente ID:
+${chatId}
+
+Para aprobar:
+
+/aprobar ${chatId} KimshantalVip`
+    );
+
+    return bot.sendPhoto(ADMIN_ID, fileId);
+  }
+
+  // TEXTO = COMPROBANTE
+  if (text && chatId !== ADMIN_ID) {
+    await bot.sendMessage(ADMIN_ID,
+`📩 Mensaje del cliente:
+
+${text}
+
+Cliente ID:
+${chatId}`
+    );
+
+    return bot.sendMessage(chatId,
+`✅ Recibido.
+
+Tu comprobante fue enviado al administrador.
+
+Espera confirmación 🙌`
+    );
+  }
+
 });
 
-console.log("Bot activo 🤖");
+// APROBAR PAGO
+bot.onText(/\/aprobar (\d+) (\w+)/, (msg, match) => {
+  if (msg.chat.id !== ADMIN_ID) return;
+
+  const clientId = match[1];
+  const channel = match[2];
+
+  if (!CHANNELS[channel]) {
+    return bot.sendMessage(ADMIN_ID, "❌ Canal inválido");
+  }
+
+  bot.sendMessage(clientId,
+`✅ Pago confirmado.
+
+Aquí está tu acceso:
+
+${CHANNELS[channel]}
+
+Gracias por tu compra 🙌`
+  );
+
+  bot.sendMessage(ADMIN_ID, "✅ Link enviado");
+});
+
+console.log("🤖 Bot activo");
 
 
