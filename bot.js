@@ -1,10 +1,21 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import fs from "fs";
+import express from "express";
 
 dotenv.config();
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+
+// EXPRESS (PUERTO PARA RENDER)
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req,res)=>{
+  res.send("Bot activo 🤖");
+});
+
+app.listen(PORT, ()=>console.log("Servidor listo"));
 
 const ADMIN_ID = 6330182024;
 const SALES_FILE = "./ventas.json";
@@ -39,123 +50,85 @@ const keyboard = {
   }
 };
 
-// guarda canal elegido
 const userSelections = {};
 
 // START
-bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id,
-`👋 Bienvenido
-
-Primero selecciona un canal 👇`,
-keyboard);
+bot.onText(/\/start/, (msg)=>{
+  bot.sendMessage(msg.chat.id,"👋 Bienvenido\nSelecciona canal 👇",keyboard);
 });
 
 // MENÚ
-bot.on("message", (msg) => {
-  if (!msg.text) return;
-  const chat = msg.chat.id;
+bot.on("message",(msg)=>{
+ if(!msg.text) return;
+ const chat=msg.chat.id;
 
-  if (msg.text === "📋 Canales") {
-    bot.sendMessage(chat,"Selecciona canal:",{
-      reply_markup:{
-        inline_keyboard:[
-          [{text:"KimshantalVip",callback_data:"select|kim"}],
-          [{text:"DianaEstradaVip",callback_data:"select|dia"}],
-          [{text:"CaeliVip",callback_data:"select|cae"}],
-          [{text:"LiviaBritoVip",callback_data:"select|liv"}],
-          [{text:"SamrazzuVIP ($100)",callback_data:"select|sam"}]
-        ]
-      }
-    });
-  }
+ if(msg.text==="📋 Canales"){
+  bot.sendMessage(chat,"Selecciona:",{
+   reply_markup:{inline_keyboard:[
+    [{text:"KimshantalVip",callback_data:"select|kim"}],
+    [{text:"DianaEstradaVip",callback_data:"select|dia"}],
+    [{text:"CaeliVip",callback_data:"select|cae"}],
+    [{text:"LiviaBritoVip",callback_data:"select|liv"}],
+    [{text:"SamrazzuVIP $100",callback_data:"select|sam"}]
+   ]}
+  });
+ }
 
-  if (msg.text === "💰 Precios") {
-    bot.sendMessage(chat,
-Object.values(CHANNELS)
-.map(c => `🔥 ${c.name} – $${c.price}`)
-.join("\n"));
-  }
+ if(msg.text==="💰 Precios"){
+  bot.sendMessage(chat,Object.values(CHANNELS).map(c=>`🔥 ${c.name} $${c.price}`).join("\n"));
+ }
 
-  if (msg.text === "💳 Pagar") {
-    if(!userSelections[chat]){
-      bot.sendMessage(chat,"⚠️ Primero selecciona canal.");
-      return;
-    }
-    bot.sendMessage(chat, CUENTA);
-  }
+ if(msg.text==="💳 Pagar"){
+  if(!userSelections[chat]) return bot.sendMessage(chat,"⚠️ Selecciona canal primero");
+  bot.sendMessage(chat,CUENTA);
+ }
 });
 
-// SELECCION CANAL
-bot.on("callback_query", async (q)=>{
-  const chat=q.message.chat.id;
-  const data=q.data;
+// SELECT
+bot.on("callback_query",async(q)=>{
+ const chat=q.message.chat.id;
+ const data=q.data;
 
-  if(data.startsWith("select")){
-    const key=data.split("|")[1];
-    userSelections[chat]=key;
+ if(data.startsWith("select")){
+  const key=data.split("|")[1];
+  userSelections[chat]=key;
+  bot.answerCallbackQuery(q.id,{text:"Seleccionado"});
+  bot.sendMessage(chat,`✅ ${CHANNELS[key].name}\nAhora 💳 Pagar`);
+  return;
+ }
 
-    bot.answerCallbackQuery(q.id,{text:"Canal seleccionado"});
-    bot.sendMessage(chat,`✅ Elegiste: ${CHANNELS[key].name}\nAhora presiona 💳 Pagar`);
-    return;
-  }
+ if(q.from.id!==ADMIN_ID) return;
 
-  // aprobar
-  if(q.from.id!==ADMIN_ID) return;
+ const [userId,key]=data.split("|");
 
-  const [userId,key]=data.split("|");
-  const canal=CHANNELS[key];
+ await bot.sendMessage(userId,`✅ Pago aprobado\n\n${CHANNELS[key].link}`);
 
-  await bot.sendMessage(userId,
-`✅ Pago aprobado
+ const ventas=JSON.parse(fs.readFileSync(SALES_FILE));
+ ventas.push({user:userId,canal:CHANNELS[key].name,precio:CHANNELS[key].price});
+ fs.writeFileSync(SALES_FILE,JSON.stringify(ventas,null,2));
 
-Acceso:
-
-${canal.link}`);
-
-  const ventas=JSON.parse(fs.readFileSync(SALES_FILE));
-  ventas.push({user:userId, canal:canal.name, precio:canal.price, fecha:new Date()});
-  fs.writeFileSync(SALES_FILE,JSON.stringify(ventas,null,2));
-
-  bot.answerCallbackQuery(q.id,{text:"Acceso enviado"});
+ bot.answerCallbackQuery(q.id,{text:"Acceso enviado"});
 });
 
 // FOTO
-bot.on("photo", async (msg)=>{
-  const userId=msg.chat.id;
-  const key=userSelections[userId];
+bot.on("photo",(msg)=>{
+ const userId=msg.chat.id;
+ const key=userSelections[userId];
+ if(!key) return bot.sendMessage(userId,"⚠️ Selecciona canal");
 
-  if(!key){
-    bot.sendMessage(userId,"⚠️ Selecciona canal primero.");
-    return;
-  }
+ bot.sendMessage(userId,"📩 Comprobante recibido");
 
-  bot.sendMessage(userId,"📩 Comprobante recibido.");
+ bot.sendMessage(ADMIN_ID,
+`📸 Nuevo pago\nID: ${userId}\nCanal: ${CHANNELS[key].name}`,
+{reply_markup:{inline_keyboard:[
+ [{text:`Aprobar ${CHANNELS[key].name}`,callback_data:`${userId}|${key}`}]
+]}});
 
-  bot.sendMessage(ADMIN_ID,
-`📸 Comprobante
-
-ID: ${userId}
-Canal: ${CHANNELS[key].name}`,
-{
-reply_markup:{
-inline_keyboard:[
-[{text:`Aprobar ${CHANNELS[key].name}`,callback_data:`${userId}|${key}`}]
-]}
+ bot.forwardMessage(ADMIN_ID,userId,msg.message_id);
 });
 
-  bot.forwardMessage(ADMIN_ID,userId,msg.message_id);
-});
+console.log("Bot funcionando 🚀");
 
-// PANEL
-bot.onText(/\/panel/, (msg)=>{
- if(msg.chat.id!==ADMIN_ID) return;
- const v=JSON.parse(fs.readFileSync(SALES_FILE));
- const t=v.reduce((a,b)=>a+b.precio,0);
- bot.sendMessage(ADMIN_ID,`Ventas: ${v.length}\nTotal: $${t}`);
-});
-
-console.log("Bot listo 🚀");
 
 
 
