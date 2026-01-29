@@ -127,6 +127,11 @@ bot.on("photo",(msg)=>{
  bot.forwardMessage(ADMIN_ID,userId,msg.message_id);
 });
 
+bot.on("channel_post",(msg)=>{
+ console.log("ID DEL CANAL:", msg.chat.id);
+});
+
+
 console.log("Bot funcionando 🚀");
 
 
