@@ -1,175 +1,174 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
-import express from "express";
 
 dotenv.config();
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
-// Mini servidor para Render (plan free)
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => res.send("Bot activo 🤖"));
-app.listen(PORT, () => console.log("Servidor listo"));
+// ================= CONFIG =================
 
 const ADMIN_ID = 6330182024;
 
-// IDs de canales VIP (solo Samrazzu real por ahora)
+// IMAGEN DE BIENVENIDA
+const BANNER_URL = "https://imgur.com/a/iw1lvAn";
+
+// CANALES
 const CHANNELS = {
-  kim: { name: "KimshantalVip", channelId: -1001111111111, price: 50 },
-  dia: { name: "DianaEstradaVip", channelId: -1002222222222, price: 50 },
-  cae: { name: "CaeliVip", channelId: -1003333333333, price: 50 },
-  liv: { name: "LiviaBritoVip", channelId: -1004444444444, price: 50 },
-  sam: { name: "SamrazzuVIP", channelId: -1003198803571, price: 100 }
+  sam: -1003198803571 // Samrazzu
 };
 
-const CUENTA = `
-💳 Transferencia
+// PRECIOS
+const PRICES = {
+  sam: "$100 MXN"
+};
 
-Banco: Mercado Pago
-Nombre: Chris Mena
-CLABE: 722969010807105889
+// Anti duplicados
+const lastAction = {};
 
-📸 Envía tu comprobante aquí.
-`;
-
+// MENÚ
 const keyboard = {
   reply_markup: {
     keyboard: [
-      ["📋 Canales", "💰 Precios"],
+      ["🔥 Canales VIP"],
+      ["💰 Precio"],
       ["💳 Pagar"]
     ],
     resize_keyboard: true
   }
 };
 
-// Guarda qué canal eligió cada usuario
-const userSelections = {};
+// DATOS DE PAGO
+const CUENTA = `
+💳 DATOS DE PAGO
 
-// /start
+Banco: Mercado Pago
+Nombre: Chris Mena
+CLABE: 722969010807105889
+
+📸 Después de pagar envía tu comprobante aquí.
+`;
+
+// ================= START =================
+
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(
+  bot.sendPhoto(
     msg.chat.id,
-    "👋 Bienvenido\n\nSelecciona un canal con el menú 👇",
-    keyboard
+    BANNER_URL,
+    {
+      caption:
+`🔥 BIENVENIDO AL SISTEMA VIP 🔥
+
+Acceso exclusivo sin censura.
+
+✔️ Contenido premium
+✔️ Actualizaciones frecuentes
+✔️ Acceso inmediato
+
+Selecciona una opción 👇`,
+      reply_markup: keyboard.reply_markup
+    }
   );
 });
 
-// Mensajes del menú
+// ================= MENSAJES =================
+
 bot.on("message", (msg) => {
-  if (!msg.text) return;
   const chatId = msg.chat.id;
+  const text = msg.text;
 
-  if (msg.text === "📋 Canales") {
-    bot.sendMessage(chatId, "Selecciona canal:", {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "KimshantalVip", callback_data: "select|kim" }],
-          [{ text: "DianaEstradaVip", callback_data: "select|dia" }],
-          [{ text: "CaeliVip", callback_data: "select|cae" }],
-          [{ text: "LiviaBritoVip", callback_data: "select|liv" }],
-          [{ text: "SamrazzuVIP $100", callback_data: "select|sam" }]
-        ]
-      }
-    });
+  if (!text) return;
+
+  if (text === "🔥 Canales VIP") {
+    bot.sendMessage(chatId,
+`🔥 CANALES DISPONIBLES
+
+⭐ SamrazzuVIP
+
+Contenido exclusivo + actualizaciones.
+
+Presiona PRECIO 👇`
+    );
   }
 
-  if (msg.text === "💰 Precios") {
-    const prices = Object.values(CHANNELS)
-      .map((c) => `🔥 ${c.name} – $${c.price} MXN`)
-      .join("\n");
+  if (text === "💰 Precio") {
+    bot.sendMessage(chatId,
+`💰 ACCESO VIP
 
-    bot.sendMessage(chatId, prices);
+SamrazzuVIP — ${PRICES.sam}
+
+✔️ Sin censura
+✔️ Contenido exclusivo
+✔️ Acceso inmediato
+
+Presiona PAGAR 👇`
+    );
   }
 
-  if (msg.text === "💳 Pagar") {
-    if (!userSelections[chatId]) {
-      bot.sendMessage(chatId, "⚠️ Primero selecciona un canal.");
-      return;
-    }
+  if (text === "💳 Pagar") {
+    const now = Date.now();
+    if (lastAction[chatId] && now - lastAction[chatId] < 2000) return;
+    lastAction[chatId] = now;
+
     bot.sendMessage(chatId, CUENTA);
   }
 });
 
-// Selección de canal y aprobación
-bot.on("callback_query", async (query) => {
-  const chatId = query.message.chat.id;
-  const data = query.data;
+// ================= COMPROBANTE =================
 
-  // Usuario selecciona canal
-  if (data.startsWith("select|")) {
-    const key = data.split("|")[1];
-    userSelections[chatId] = key;
+bot.on("photo", async (msg) => {
+  const chatId = msg.chat.id;
 
-    bot.answerCallbackQuery(query.id, { text: "Canal seleccionado" });
-    bot.sendMessage(
-      chatId,
-      `✅ Elegiste: ${CHANNELS[key].name}\n\nAhora presiona 💳 Pagar`
-    );
+  bot.sendMessage(chatId, "📩 Comprobante recibido. Será revisado.");
+
+  bot.sendMessage(ADMIN_ID,
+`📸 NUEVO COMPROBANTE
+
+ID: ${chatId}
+
+Aprueba con:
+/aprobar ${chatId} sam`
+  );
+
+  bot.forwardMessage(ADMIN_ID, chatId, msg.message_id);
+});
+
+// ================= APROBACIÓN =================
+
+bot.onText(/\/aprobar (\d+) (.+)/, async (msg, match) => {
+  if (msg.chat.id !== ADMIN_ID) return;
+
+  const userId = Number(match[1]);
+  const key = match[2].toLowerCase();
+
+  if (!CHANNELS[key]) {
+    bot.sendMessage(ADMIN_ID, "❌ Canal inválido");
     return;
   }
 
-  // Admin aprueba pago
-  if (query.from.id !== ADMIN_ID) return;
-
-  const [userId, key] = data.split("|");
-  const canal = CHANNELS[key];
-
   try {
-    // Crear link de un solo uso
-    const invite = await bot.createChatInviteLink(canal.channelId, {
+    const link = await bot.createChatInviteLink(CHANNELS[key], {
       member_limit: 1
     });
 
-    // Enviar acceso al usuario
-    await bot.sendMessage(
-      userId,
-      `✅ Pago aprobado\n\nAccede aquí 👇\n${invite.invite_link}`
+    await bot.sendMessage(userId,
+`✅ PAGO CONFIRMADO
+
+Aquí tu acceso VIP:
+
+${link.invite_link}
+
+Gracias por tu compra 🔥`
     );
 
-    bot.answerCallbackQuery(query.id, { text: "Acceso enviado" });
+    bot.sendMessage(ADMIN_ID, "✅ Acceso enviado");
+
   } catch (err) {
-    console.error(err);
-    bot.answerCallbackQuery(query.id, { text: "Error enviando acceso" });
+    bot.sendMessage(ADMIN_ID, "❌ Error al enviar acceso");
+    console.log(err);
   }
 });
 
-// Cuando el usuario manda foto (comprobante)
-bot.on("photo", (msg) => {
-  const userId = msg.chat.id;
-  const key = userSelections[userId];
-
-  if (!key) {
-    bot.sendMessage(userId, "⚠️ Primero selecciona un canal.");
-    return;
-  }
-
-  bot.sendMessage(userId, "📩 Comprobante recibido. En revisión.");
-
-  // Avisar al admin
-  bot.sendMessage(
-    ADMIN_ID,
-    `📸 Nuevo comprobante\n\nID: ${userId}\nCanal: ${CHANNELS[key].name}`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: `Aprobar ${CHANNELS[key].name}`,
-              callback_data: `${userId}|${key}`
-            }
-          ]
-        ]
-      }
-    }
-  );
-
-  // Reenviar la imagen al admin
-  bot.forwardMessage(ADMIN_ID, userId, msg.message_id);
-});
-
-console.log("Bot VIP funcionando 🚀");
+console.log("🤖 Bot VIP activo");
 
 
 
