@@ -10,7 +10,7 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 const ADMIN_ID = 6330182024;
 
 // IMAGEN DE BIENVENIDA
-const BANNER_URL = "https://imgur.com/a/iw1lvAn";
+const BANNER_URL = "https://i.imgur.com/04yMt6w.png";
 
 // CANALES
 const CHANNELS = {
