@@ -33,25 +33,34 @@ CLABE: 722969010807105889
 📸 Envía tu comprobante aquí.
 `;
 
+const CONTENT = `
+📦 Contenido VIP incluye:
+
+✅ Fotos exclusivas
+✅ Videos sin censura
+✅ Contenido diario
+`;
+
 const keyboard = {
   reply_markup: {
     keyboard: [
       ["📋 Canales", "💰 Precios"],
-      ["💳 Pagar"]
+      ["📦 Contenido VIP", "💳 Pagar"]
     ],
     resize_keyboard: true
   }
 };
 
-// Guarda selección
 const userSelections = {};
 const waitingApproval = {};
+const alreadySent = {};
 
 // START
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(
-    msg.chat.id,
-    "👋 Bienvenido\n\nSelecciona un canal con el menú 👇",
+  bot.sendMessage(msg.chat.id,
+`👋 Bienvenido a JM Canales VIP
+
+Selecciona un canal 👇`,
     keyboard
   );
 });
@@ -69,98 +78,130 @@ bot.on("message", (msg) => {
           [{ text: "DianaEstradaVip", callback_data: "select|dia" }],
           [{ text: "CaeliVip", callback_data: "select|cae" }],
           [{ text: "YerimuaVip", callback_data: "select|liv" }],
-          [{ text: "SamrazzuVIP $100", callback_data: "select|sam" }]
+          [{ text: "SamrazzuVIP", callback_data: "select|sam" }]
         ]
       }
     });
   }
 
   if (msg.text === "💰 Precios") {
-    const prices = Object.values(CHANNELS)
-      .map((c) => `🔥 ${c.name} – $${c.price} MXN`)
-      .join("\n");
+    bot.sendMessage(chatId,
+      Object.values(CHANNELS)
+        .map(c => `🔥 ${c.name} – $${c.price}`)
+        .join("\n")
+    );
+  }
 
-    bot.sendMessage(chatId, prices);
+  if (msg.text === "📦 Contenido VIP") {
+    bot.sendMessage(chatId, CONTENT);
   }
 
   if (msg.text === "💳 Pagar") {
-    if (!userSelections[chatId]) {
-      bot.sendMessage(chatId, "⚠️ Primero selecciona un canal.");
-      return;
-    }
+    if (!userSelections[chatId]) return bot.sendMessage(chatId, "⚠️ Primero selecciona un canal.");
     bot.sendMessage(chatId, CUENTA);
   }
 });
 
-// BOTONES
-bot.on("callback_query", async (query) => {
-  const chatId = query.message.chat.id;
-  const data = query.data;
+// CALLBACKS
+bot.on("callback_query", async (q) => {
+  const chatId = q.message.chat.id;
+  const data = q.data;
 
-  // Usuario selecciona canal
+  // Selección canal
   if (data.startsWith("select|")) {
     const key = data.split("|")[1];
     userSelections[chatId] = key;
 
-    bot.answerCallbackQuery(query.id);
-    bot.sendMessage(chatId, `✅ Elegiste ${CHANNELS[key].name}\n\nPresiona 💳 Pagar`);
+    bot.answerCallbackQuery(q.id);
+    bot.sendMessage(chatId,
+`✅ ${CHANNELS[key].name}
+💰 Precio: $${CHANNELS[key].price}
+
+Ahora presiona 💳 Pagar`
+    );
     return;
   }
 
-  // ADMIN aprueba
-  if (query.from.id !== ADMIN_ID) return;
+  // Usuario decide continuar
+  if (data === "more") {
+    delete userSelections[chatId];
+    bot.answerCallbackQuery(q.id);
+    bot.sendMessage(chatId, "Selecciona otro canal 👇", keyboard);
+    return;
+  }
 
-  const [userId, key] = data.split("|");
-  const canal = CHANNELS[key];
+  if (data === "finish") {
+    delete userSelections[chatId];
+    bot.answerCallbackQuery(q.id);
+    bot.sendMessage(chatId, "Gracias por tu compra 🙌\nEscribe /start cuando quieras.");
+    return;
+  }
+
+  // Admin
+  if (q.from.id !== ADMIN_ID) return;
+
+  const [userId, key, action] = data.split("|");
+
+  if (action === "reject") {
+    delete waitingApproval[userId];
+    bot.sendMessage(userId, "❌ Tu comprobante fue rechazado.");
+    bot.answerCallbackQuery(q.id);
+    return;
+  }
+
+  if (alreadySent[userId]) {
+    bot.answerCallbackQuery(q.id, { text: "Ya enviado" });
+    return;
+  }
 
   try {
+    const canal = CHANNELS[key];
+
     const invite = await bot.createChatInviteLink(canal.channelId, {
       member_limit: 1
     });
 
-    await bot.sendMessage(
-      userId,
+    await bot.sendMessage(userId,
 `✅ Pago aprobado
 
-🎉 Bienvenido a ${canal.name}
-
-Acceso único 👇
-${invite.invite_link}
-
-Gracias 🙌`
+Acceso único:
+${invite.invite_link}`
     );
 
-    delete waitingApproval[userId];
-    delete userSelections[userId];
+    await bot.sendMessage(userId, "¿Te interesa otro canal?", {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Sí", callback_data: "more" }],
+          [{ text: "No", callback_data: "finish" }]
+        ]
+      }
+    });
 
-    bot.answerCallbackQuery(query.id, { text: "Acceso enviado" });
-  } catch (err) {
-    console.error(err);
-    bot.answerCallbackQuery(query.id, { text: "Error" });
+    alreadySent[userId] = true;
+    delete waitingApproval[userId];
+
+    bot.answerCallbackQuery(q.id, { text: "Acceso enviado" });
+
+  } catch (e) {
+    console.log(e);
+    bot.answerCallbackQuery(q.id, { text: "Error" });
   }
 });
 
-// FOTO COMPROBANTE
+// FOTO
 bot.on("photo", (msg) => {
   const userId = msg.chat.id;
   const key = userSelections[userId];
 
-  if (!key) {
-    bot.sendMessage(userId, "⚠️ Primero selecciona un canal.");
-    return;
-  }
+  if (!key) return bot.sendMessage(userId, "⚠️ Selecciona canal primero.");
 
-  if (waitingApproval[userId]) {
-    bot.sendMessage(userId, "⏳ Tu pago ya está en revisión.");
-    return;
-  }
+  if (waitingApproval[userId]) return bot.sendMessage(userId, "⏳ Ya está en revisión.");
 
   waitingApproval[userId] = true;
 
-  bot.sendMessage(userId, "📩 Comprobante recibido. En revisión.");
+  bot.sendMessage(userId, "📩 Comprobante recibido.");
 
-  bot.sendMessage(
-    ADMIN_ID,
+  bot.sendMessage(ADMIN_ID,
 `📸 Nuevo comprobante
 
 ID: ${userId}
@@ -169,10 +210,8 @@ Canal: ${CHANNELS[key].name}`,
       reply_markup: {
         inline_keyboard: [
           [
-            {
-              text: `Aprobar ${CHANNELS[key].name}`,
-              callback_data: `${userId}|${key}`
-            }
+            { text: "✅ Aprobar", callback_data: `${userId}|${key}|ok` },
+            { text: "❌ Rechazar", callback_data: `${userId}|${key}|reject` }
           ]
         ]
       }
@@ -182,7 +221,8 @@ Canal: ${CHANNELS[key].name}`,
   bot.forwardMessage(ADMIN_ID, userId, msg.message_id);
 });
 
-console.log("Bot VIP funcionando 🚀");
+console.log("JM VIP activo 🚀");
+
 
 
 
